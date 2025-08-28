@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 익명 투표</title>
+    <title>익명 투표</title>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -465,7 +465,6 @@
                         <i data-lucide="vote"></i>
                         실시간 익명 투표
                     </h1>
-                    <p>Firebase 기반 실시간 투표 시스템</p>
                 </div>
                 <div class="connection-status">
                     <i data-lucide="database"></i>
@@ -589,46 +588,69 @@
 
         // Firebase 초기화를 페이지 로드 후에 실행
         function initFirebase() {
-            try {
-                console.log('Firebase 초기화 시작...');
-                firebase.initializeApp(firebaseConfig);
-                database = firebase.database();
-                votesRef = database.ref('votes');
-                
-                console.log('Firebase 연결 성공');
-                updateConnectionStatus('connected');
-                isFirebaseConnected = true;
-                
-                // 실시간 데이터 리스너
-                votesRef.on('value', (snapshot) => {
-                    console.log('Firebase에서 데이터 수신:', snapshot.val());
-                    votes = snapshot.val() || {};
-                    updateResults();
-                });
-                
-                // 연결 상태 모니터링
-                database.ref('.info/connected').on('value', (snapshot) => {
-                    if (snapshot.val() === true) {
-                        console.log('Firebase 실시간 연결됨');
-                        updateConnectionStatus('connected');
-                        isFirebaseConnected = true;
-                    } else {
-                        console.log('Firebase 연결 끊어짐');
-                        updateConnectionStatus('disconnected');
-                        isFirebaseConnected = false;
+            return new Promise((resolve, reject) => {
+                try {
+                    console.log('Firebase 초기화 시작...');
+                    console.log('Firebase 설정:', firebaseConfig);
+                    
+                    // Firebase가 로드되었는지 확인
+                    if (typeof firebase === 'undefined') {
+                        throw new Error('Firebase 라이브러리가 로드되지 않았습니다');
                     }
-                });
-                
-            } catch (error) {
-                console.error('Firebase 초기화 실패:', error);
-                isFirebaseConnected = false;
-                updateConnectionStatus('disconnected');
-                
-                // Firebase 연결 실패 시 localStorage 폴백
-                console.log('localStorage 모드로 전환');
-                loadVotesFromStorage();
-                updateResults();
-            }
+                    
+                    // Firebase 앱 초기화
+                    firebase.initializeApp(firebaseConfig);
+                    console.log('Firebase 앱 초기화 완료');
+                    
+                    // Database 레퍼런스 생성
+                    database = firebase.database();
+                    votesRef = database.ref('votes');
+                    console.log('Database 레퍼런스 생성 완료');
+                    
+                    // 연결 테스트
+                    database.ref('.info/connected').once('value')
+                        .then((snapshot) => {
+                            if (snapshot.val() === true) {
+                                console.log('Firebase 연결 테스트 성공');
+                                isFirebaseConnected = true;
+                                updateConnectionStatus('connected');
+                                
+                                // 실시간 데이터 리스너 설정
+                                votesRef.on('value', (snapshot) => {
+                                    console.log('Firebase에서 데이터 수신:', snapshot.val());
+                                    votes = snapshot.val() || {};
+                                    updateResults();
+                                });
+                                
+                                // 연결 상태 실시간 모니터링
+                                database.ref('.info/connected').on('value', (snapshot) => {
+                                    if (snapshot.val() === true) {
+                                        console.log('Firebase 실시간 연결 유지됨');
+                                        isFirebaseConnected = true;
+                                        updateConnectionStatus('connected');
+                                    } else {
+                                        console.log('Firebase 연결이 끊어짐');
+                                        isFirebaseConnected = false;
+                                        updateConnectionStatus('disconnected');
+                                    }
+                                });
+                                
+                                resolve();
+                            } else {
+                                throw new Error('Firebase 연결 테스트 실패');
+                            }
+                        })
+                        .catch((error) => {
+                            throw error;
+                        });
+                        
+                } catch (error) {
+                    console.error('Firebase 초기화 실패:', error);
+                    isFirebaseConnected = false;
+                    updateConnectionStatus('disconnected');
+                    reject(error);
+                }
+            });
         }
 
         // 전역 변수
@@ -654,7 +676,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('페이지 로드됨');
             
-            // 연결 상태를 먼저 connecting으로 설정
+            // 연결 상태를 connecting으로 설정
             updateConnectionStatus('connecting');
             
             // Lucide 라이브러리 로드 대기
@@ -662,10 +684,23 @@
                 initIcons();
             }, 100);
             
-            // Firebase 초기화 (약간의 지연 후)
+            // Firebase 초기화 (충분한 지연 후)
             setTimeout(function() {
-                initFirebase();
-            }, 500);
+                initFirebase()
+                    .then(() => {
+                        console.log('Firebase 초기화 완료');
+                        // 초기 데이터 로드는 리스너에서 자동으로 됨
+                    })
+                    .catch((error) => {
+                        console.error('Firebase 초기화 실패, 로컬 모드로 전환:', error);
+                        alert('Firebase 연결에 실패했습니다. 로컬 모드로 동작합니다.\n에러: ' + error.message);
+                        
+                        // 로컬 모드로 전환
+                        loadVotesFromStorage();
+                        updateResults();
+                        setInterval(loadVotesFromStorage, 3000);
+                    });
+            }, 1000);
             
             // 투표 입력창 Enter 키 이벤트
             const voteInput = document.getElementById('voteInput');
@@ -677,16 +712,6 @@
                     }
                 });
             }
-            
-            // 폴백으로 localStorage 데이터도 로드
-            setTimeout(function() {
-                if (!isFirebaseConnected) {
-                    console.log('Firebase 연결 실패, localStorage 사용');
-                    loadVotesFromStorage();
-                    updateResults();
-                    setInterval(loadVotesFromStorage, 3000);
-                }
-            }, 3000);
         });
 
         // Firebase 초기화 코드를 제거하고 위쪽으로 이동했습니다
@@ -722,14 +747,14 @@
 
             if (!voteInput || !submitButton) {
                 console.error('필수 요소를 찾을 수 없음');
+                alert('페이지 요소를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
                 return;
             }
 
             const inputValue = voteInput.value ? voteInput.value.trim() : '';
             console.log('입력값:', `"${inputValue}"`);
-            console.log('입력값 길이:', inputValue.length);
-            console.log('제출 중인가:', isSubmitting);
             console.log('Firebase 연결 상태:', isFirebaseConnected);
+            console.log('votesRef 존재:', !!votesRef);
 
             if (!inputValue) {
                 console.log('입력값이 비어있음');
@@ -742,91 +767,71 @@
                 return;
             }
 
+            if (!isFirebaseConnected || !votesRef) {
+                console.error('Firebase 연결되지 않음');
+                alert('Firebase에 연결되지 않았습니다. 페이지를 새로고침하거나 네트워크를 확인해주세요.');
+                return;
+            }
+
             // UI 업데이트
             isSubmitting = true;
             submitButton.disabled = true;
             submitButton.style.opacity = '0.7';
-            submitButton.innerHTML = '⟳ 투표 중...';
+            submitButton.innerHTML = '⟳ Firebase에 저장 중...';
             
             if (errorMessage) {
                 errorMessage.classList.add('hidden');
             }
             
-            console.log('투표 내용:', inputValue);
+            console.log('Firebase로 투표 전송:', inputValue);
             
-            if (isFirebaseConnected && votesRef) {
-                // Firebase 사용
-                console.log('Firebase로 투표 전송 중...');
+            // Firebase transaction 사용
+            votesRef.child(inputValue).transaction((currentData) => {
+                console.log('Transaction 실행 - 현재 데이터:', currentData);
+                return (currentData || 0) + 1;
+            }).then((result) => {
+                console.log('Firebase 투표 성공:', result.snapshot.val());
+                console.log('Transaction 완료:', result.committed);
                 
-                votesRef.child(inputValue).transaction((current) => {
-                    console.log('Firebase transaction 실행, 현재값:', current);
-                    return (current || 0) + 1;
-                }).then((result) => {
-                    console.log('Firebase 투표 성공:', result);
+                if (result.committed) {
                     voteInput.value = '';
-                    
-                    // 성공 메시지
-                    alert('투표가 완료되었습니다!');
+                    alert('✅ Firebase에 투표가 저장되었습니다!');
                     
                     setTimeout(() => {
                         showTab('results');
                     }, 300);
-                    
-                }).catch((error) => {
-                    console.error('Firebase 투표 실패:', error);
-                    const errorMsg = 'Firebase 오류: ' + (error.message || error);
-                    if (errorMessage) {
-                        errorMessage.textContent = errorMsg;
-                        errorMessage.classList.remove('hidden');
-                    }
-                    alert(errorMsg);
-                    
-                }).finally(() => {
-                    console.log('Firebase 투표 완료 처리');
-                    isSubmitting = false;
-                    submitButton.disabled = false;
-                    submitButton.style.opacity = '1';
-                    submitButton.innerHTML = '📤 익명으로 투표하기';
-                });
+                } else {
+                    console.warn('Transaction이 커밋되지 않음');
+                    alert('⚠️ 투표 처리 중 문제가 발생했습니다. 다시 시도해주세요.');
+                }
                 
-            } else {
-                // localStorage 폴백
-                console.log('localStorage로 투표 저장 중...');
+            }).catch((error) => {
+                console.error('Firebase 투표 실패:', error);
+                console.error('에러 코드:', error.code);
+                console.error('에러 메시지:', error.message);
                 
-                setTimeout(() => {
-                    try {
-                        votes[inputValue] = (votes[inputValue] || 0) + 1;
-                        saveVotesToStorage();
-                        updateResults();
-                        
-                        console.log('localStorage 투표 저장 완료:', votes);
-                        
-                        voteInput.value = '';
-                        
-                        alert('투표가 완료되었습니다! (로컬 저장)');
-                        
-                        setTimeout(() => {
-                            showTab('results');
-                        }, 300);
-                        
-                    } catch (error) {
-                        console.error('localStorage 투표 저장 오류:', error);
-                        const errorMsg = '투표 저장 중 오류: ' + error.message;
-                        if (errorMessage) {
-                            errorMessage.textContent = errorMsg;
-                            errorMessage.classList.remove('hidden');
-                        }
-                        alert(errorMsg);
-                        
-                    } finally {
-                        console.log('localStorage 투표 완료 처리');
-                        isSubmitting = false;
-                        submitButton.disabled = false;
-                        submitButton.style.opacity = '1';
-                        submitButton.innerHTML = '📤 익명으로 투표하기';
-                    }
-                }, 500); // 시뮬레이션 딜레이
-            }
+                let errorMsg = 'Firebase 저장 실패: ';
+                if (error.code === 'PERMISSION_DENIED') {
+                    errorMsg += '데이터베이스 권한이 없습니다. Firebase 보안 규칙을 확인해주세요.';
+                } else if (error.code === 'NETWORK_ERROR') {
+                    errorMsg += '네트워크 연결을 확인해주세요.';
+                } else {
+                    errorMsg += error.message || error.toString();
+                }
+                
+                if (errorMessage) {
+                    errorMessage.textContent = errorMsg;
+                    errorMessage.classList.remove('hidden');
+                }
+                alert('❌ ' + errorMsg);
+                
+            }).finally(() => {
+                console.log('Firebase 투표 처리 완료');
+                isSubmitting = false;
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                submitButton.innerHTML = '📤 익명으로 투표하기';
+            });
         }
 
         // 투표 결과 업데이트

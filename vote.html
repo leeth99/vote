@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 익명 투표</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f3e8ff 0%, #dbeafe 100%);
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+
+        .container {
+            max-width: 64rem;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #9333ea 0%, #2563eb 100%);
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content h1 {
+            font-size: 1.875rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-content p {
+            color: #c4b5fd;
+            margin-top: 0.5rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-connecting {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+        .navigation {
+            background: #f9fafb;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-button.active {
+            background: #9333ea;
+            color: white;
+        }
+
+        .nav-button.inactive {
+            background: white;
+            color: #6b7280;
+        }
+
+        .nav-button.inactive:hover {
+            background: #f3f4f6;
+        }
+
+        .content {
+            padding: 1.5rem;
+        }
+
+        .vote-section {
+            max-width: 32rem;
+            margin: 0 auto;
+        }
+
+        .vote-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .vote-header h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+
+        .vote-header p {
+            color: #6b7280;
+        }
+
+        .vote-form {
+            background: linear-gradient(135deg, #f3e8ff 0%, #dbeafe 100%);
+            border-radius: 0.75rem;
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.75rem;
+        }
+
+        .vote-input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #d1d5db;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            resize: none;
+            transition: all 0.2s;
+        }
+
+        .vote-input:focus {
+            outline: none;
+            border-color: #9333ea;
+            box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
+        }
+
+        .vote-input:disabled {
+            background: #f9fafb;
+            color: #6b7280;
+        }
+
+        .submit-button {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #9333ea 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .submit-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #7c3aed 0%, #1d4ed8 100%);
+        }
+
+        .submit-button:disabled {
+            background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .results-header h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, #e879f9 0%, #60a5fa 100%);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #7c3aed;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-label {
+            color: #374151;
+            font-weight: 500;
+        }
+
+        .empty-results {
+            text-align: center;
+            padding: 3rem 0;
+            color: #6b7280;
+        }
+
+        .empty-results svg {
+            width: 4rem;
+            height: 4rem;
+            margin: 0 auto 1rem;
+            color: #d1d5db;
+        }
+
+        .empty-results h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-item {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid #f3f4f6;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+
+        .result-item:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .result-content {
+            flex: 1;
+        }
+
+        .rank-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        .rank-1 {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .rank-2 {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .rank-3 {
+            background: #fed7aa;
+            color: #c2410c;
+        }
+
+        .rank-other {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .result-text {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: #1f2937;
+            word-break: break-words;
+        }
+
+        .result-stats {
+            text-align: right;
+            margin-left: 1rem;
+        }
+
+        .result-votes {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #7c3aed;
+        }
+
+        .result-percentage {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 0.75rem;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+            transition: width 1s ease-out;
+            border-radius: 9999px;
+        }
+
+        .admin-section {
+            max-width: 32rem;
+            margin: 0 auto;
+        }
+
+        .danger-zone {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .danger-zone h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #dc2626;
+            margin-bottom: 1rem;
+        }
+
+        .danger-zone p {
+            color: #b91c1c;
+            margin-bottom: 0.75rem;
+        }
+
+        .danger-button {
+            padding: 0.75rem 1.5rem;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .danger-button:hover {
+            background: #b91c1c;
+        }
+
+        .info-card {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 1rem;
+        }
+
+        .info-list {
+            color: #1e40af;
+            font-size: 0.875rem;
+        }
+
+        .info-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .info-value {
+            font-weight: 500;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .rotating {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-message {
+            text-align: center;
+            font-size: 0.875rem;
+            color: #dc2626;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <!-- 헤더 -->
+            <div class="header">
+                <div class="header-content">
+                    <h1>
+                        <i data-lucide="vote"></i>
+                        실시간 익명 투표
+                    </h1>
+                    <p>Firebase 기반 실시간 투표 시스템</p>
+                </div>
+                <div class="connection-status">
+                    <i data-lucide="database"></i>
+                    <span id="connectionStatus" class="status-badge status-connected">연결됨</span>
+                </div>
+            </div>
+
+            <!-- 네비게이션 -->
+            <div class="navigation">
+                <div class="nav-buttons">
+                    <button class="nav-button active" onclick="showTab('vote')" id="voteTab">
+                        <i data-lucide="vote"></i>
+                        투표하기
+                    </button>
+                    <button class="nav-button inactive" onclick="showTab('results')" id="resultsTab">
+                        <i data-lucide="bar-chart-3"></i>
+                        실시간 결과 (<span id="totalVotesNav">0</span>)
+                    </button>
+                    <button class="nav-button inactive" onclick="showTab('admin')" id="adminTab">
+                        <i data-lucide="database"></i>
+                        관리
+                    </button>
+                </div>
+            </div>
+
+            <!-- 컨텐츠 영역 -->
+            <div class="content">
+                <!-- 투표 탭 -->
+                <div id="voteContent" class="vote-section">
+                    <div class="vote-header">
+                        <h2>익명 투표</h2>
+                        <p>모든 투표는 실시간으로 반영되며 완전 익명입니다</p>
+                    </div>
+                    
+                    <div class="vote-form">
+                        <div class="form-group">
+                            <label class="form-label">투표 내용을 입력하세요</label>
+                            <textarea 
+                                id="voteInput" 
+                                class="vote-input" 
+                                rows="4" 
+                                placeholder="후보자 이름, 선택지, 의견 등을 자유롭게 입력하세요...">
+                            </textarea>
+                        </div>
+                        
+                        <button id="submitButton" class="submit-button" onclick="submitVote()">
+                            📤 익명으로 투표하기
+                        </button>
+                        
+                        <div id="errorMessage" class="error-message hidden">
+                            Firebase에 연결되지 않았습니다. 잠시 후 다시 시도해주세요.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 결과 탭 -->
+                <div id="resultsContent" class="hidden">
+                    <div class="results-header">
+                        <h2>실시간 투표 결과</h2>
+                        <div class="auto-refresh">
+                            <span>자동 새로고침</span>
+                            <i data-lucide="refresh-cw" class="rotating"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-card">
+                        <div id="totalVotes" class="stats-number">0</div>
+                        <div class="stats-label">총 투표 수</div>
+                    </div>
+
+                    <div id="resultsContainer">
+                        <div class="empty-results">
+                            <i data-lucide="vote"></i>
+                            <h3>아직 투표가 없습니다</h3>
+                            <div>첫 번째 투표를 해보세요!</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 관리 탭 -->
+                <div id="adminContent" class="admin-section hidden">
+                    <h2>시스템 관리</h2>
+                    
+                    <div class="danger-zone">
+                        <h3>위험 구역</h3>
+                        <p>모든 투표 데이터를 삭제합니다. 이 작업은 되돌릴 수 없습니다.</p>
+                        <button class="danger-button" onclick="resetVotes()">
+                            모든 투표 데이터 삭제
+                        </button>
+                    </div>
+
+                    <div class="info-card">
+                        <h3>Firebase 연결 정보</h3>
+                        <div class="info-list">
+                            <div class="info-item">상태: <span id="adminStatus" class="info-value">연결됨</span></div>
+                            <div class="info-item">총 투표 수: <span id="adminVotes" class="info-value">0</span></div>
+                            <div class="info-item">데이터베이스: <span class="info-value">Firebase Realtime Database</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase 설정 (여기에 실제 Firebase 설정을 입력하세요)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAjdGFdizcWev-enNVYt7YyaOYAZx6jjgM",
+            authDomain: "vote-b51e7.firebaseapp.com",
+            databaseURL: "https://vote-b51e7-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "vote-b51e7"
+        };
+
+        // 전역 변수
+        let votes = {};
+        let isSubmitting = false;
+        let currentTab = 'vote';
+
+        // 아이콘 초기화 함수
+        function initIcons() {
+            try {
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    // 결과 업데이트 후 아이콘 초기화
+            setTimeout(initIcons, 100);
+                } else {
+                    console.log('Lucide 라이브러리가 로드되지 않음');
+                }
+            } catch (error) {
+                console.log('아이콘 초기화 오류:', error);
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('페이지 로드됨');
+            
+            // Lucide 라이브러리 로드 대기
+            setTimeout(function() {
+                initIcons();
+            }, 100);
+            
+            // 저장된 데이터 로드
+            loadVotesFromStorage();
+            updateResults();
+            
+            // 투표 입력창 Enter 키 이벤트
+            const voteInput = document.getElementById('voteInput');
+            if (voteInput) {
+                voteInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        submitVote();
+                    }
+                });
+            }
+            
+            // 시뮬레이션용 자동 새로고침
+            setInterval(loadVotesFromStorage, 2000);
+        });
+
+        // Firebase 초기화 (실제 사용시 주석 해제)
+        /*
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const votesRef = database.ref('votes');
+        
+        // 실시간 데이터 리스너
+        votesRef.on('value', (snapshot) => {
+            votes = snapshot.val() || {};
+            updateResults();
+        });
+        */
+
+        // 탭 전환
+        function showTab(tabName) {
+            // 모든 탭 내용 숨기기
+            document.getElementById('voteContent').classList.add('hidden');
+            document.getElementById('resultsContent').classList.add('hidden');
+            document.getElementById('adminContent').classList.add('hidden');
+
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                btn.classList.remove('active');
+                btn.classList.add('inactive');
+            });
+
+            // 선택된 탭 보이기
+            document.getElementById(tabName + 'Content').classList.remove('hidden');
+            document.getElementById(tabName + 'Tab').classList.remove('inactive');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+            currentTab = tabName;
+        }
+
+        // 투표 제출
+        function submitVote() {
+            console.log('투표 제출 함수 호출됨');
+            
+            const voteInput = document.getElementById('voteInput');
+            const submitButton = document.getElementById('submitButton');
+            const errorMessage = document.getElementById('errorMessage');
+
+            console.log('입력값:', voteInput.value);
+            console.log('제출 중인가:', isSubmitting);
+
+            if (!voteInput.value.trim()) {
+                console.log('입력값이 비어있음');
+                return;
+            }
+            
+            if (isSubmitting) {
+                console.log('이미 제출 중');
+                return;
+            }
+
+            isSubmitting = true;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span style="display: inline-flex; align-items: center; gap: 0.5rem;"><span style="animation: spin 1s linear infinite; display: inline-block;">⟳</span> 투표 중...</span>';
+            
+            try {
+                const vote = voteInput.value.trim();
+                console.log('투표 내용:', vote);
+                
+                // 실제 Firebase 사용시 주석 해제
+                /*
+                votesRef.child(vote).transaction((current) => {
+                    return (current || 0) + 1;
+                }).then(() => {
+                    voteInput.value = '';
+                    errorMessage.classList.add('hidden');
+                    
+                    setTimeout(() => {
+                        showTab('results');
+                    }, 500);
+                }).catch((error) => {
+                    console.error('투표 제출 오류:', error);
+                    errorMessage.textContent = '투표 제출 중 오류가 발생했습니다. 다시 시도해주세요.';
+                    errorMessage.classList.remove('hidden');
+                }).finally(() => {
+                    isSubmitting = false;
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = '📤 익명으로 투표하기';
+                });
+                */
+                
+                // 시뮬레이션: localStorage 사용
+                votes[vote] = (votes[vote] || 0) + 1;
+                saveVotesToStorage();
+                updateResults();
+                
+                console.log('투표 저장 완료');
+                
+                voteInput.value = '';
+                errorMessage.classList.add('hidden');
+                
+                setTimeout(() => {
+                    showTab('results');
+                }, 500);
+                
+            } catch (error) {
+                console.error('투표 제출 오류:', error);
+                errorMessage.textContent = '투표 제출 중 오류가 발생했습니다. 다시 시도해주세요.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                isSubmitting = false;
+                submitButton.disabled = false;
+                submitButton.innerHTML = '📤 익명으로 투표하기';
+            }
+        }
+
+        // 투표 결과 업데이트
+        function updateResults() {
+            const totalVotes = Object.values(votes).reduce((sum, count) => sum + count, 0);
+            const sortedResults = Object.entries(votes).sort((a, b) => b[1] - a[1]);
+
+            // 총 투표 수 업데이트
+            document.getElementById('totalVotes').textContent = totalVotes;
+            document.getElementById('totalVotesNav').textContent = totalVotes;
+            document.getElementById('adminVotes').textContent = totalVotes;
+
+            // 결과 컨테이너
+            const resultsContainer = document.getElementById('resultsContainer');
+
+            // HTML에서 lucide 아이콘을 이모지로 임시 교체
+            if (sortedResults.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="empty-results">
+                        🗳️
+                        <h3>아직 투표가 없습니다</h3>
+                        <div>첫 번째 투표를 해보세요!</div>
+                    </div>
+                `;
+            } else {
+                resultsContainer.innerHTML = sortedResults.map(([vote, count], index) => {
+                    const percentage = Math.round((count / totalVotes) * 100);
+                    const rankClass = index === 0 ? 'rank-1' : 
+                                     index === 1 ? 'rank-2' : 
+                                     index === 2 ? 'rank-3' : 'rank-other';
+                    
+                    return `
+                        <div class="result-item">
+                            <div class="result-header">
+                                <div class="result-content">
+                                    <span class="rank-badge ${rankClass}">${index + 1}위</span>
+                                    <div class="result-text">${vote}</div>
+                                </div>
+                                <div class="result-stats">
+                                    <div class="result-votes">${count}</div>
+                                    <div class="result-percentage">표 (${percentage}%)</div>
+                                </div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            lucide.createIcons();
+        }
+
+        // 투표 초기화
+        function resetVotes() {
+            if (confirm('모든 투표 데이터를 삭제하시겠습니까?')) {
+                // 실제 Firebase 사용시 주석 해제
+                // votesRef.remove();
+                
+                // 시뮬레이션
+                votes = {};
+                saveVotesToStorage();
+                updateResults();
+            }
+        }
+
+        // Enter 키로 투표 제출 - 중복 제거됨 (위쪽 DOMContentLoaded에서 처리)
+
+        // localStorage 시뮬레이션 함수들
+        function saveVotesToStorage() {
+            localStorage.setItem('votes', JSON.stringify(votes));
+        }
+
+        function loadVotesFromStorage() {
+            const storedVotes = localStorage.getItem('votes');
+            if (storedVotes) {
+                votes = JSON.parse(storedVotes);
+                updateResults();
+            }
+        }
+    </script>
+</body>
+</html>

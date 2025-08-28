@@ -121,6 +121,12 @@
             background: #f3f4f6;
         }
 
+        .nav-button:disabled {
+            background: #f3f4f6;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+
         .content {
             padding: 1.5rem;
         }
@@ -146,6 +152,52 @@
             color: #6b7280;
         }
 
+        .vote-status-card {
+            background: linear-gradient(135deg, #f3e8ff 0%, #dbeafe 100%);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .status-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .status-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-description {
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+
+        .topic-display {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .topic-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .topic-text {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
         .vote-form {
             background: linear-gradient(135deg, #f3e8ff 0%, #dbeafe 100%);
             border-radius: 0.75rem;
@@ -164,7 +216,7 @@
             margin-bottom: 0.75rem;
         }
 
-        .vote-input {
+        .vote-input, .topic-input {
             width: 100%;
             padding: 1rem;
             border: 2px solid #d1d5db;
@@ -174,22 +226,20 @@
             transition: all 0.2s;
         }
 
-        .vote-input:focus {
+        .vote-input:focus, .topic-input:focus {
             outline: none;
             border-color: #9333ea;
             box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
         }
 
-        .vote-input:disabled {
+        .vote-input:disabled, .topic-input:disabled {
             background: #f9fafb;
             color: #6b7280;
         }
 
-        .submit-button {
+        .control-button {
             width: 100%;
             padding: 1rem 1.5rem;
-            background: linear-gradient(135deg, #9333ea 0%, #2563eb 100%);
-            color: white;
             border: none;
             border-radius: 0.75rem;
             font-size: 1rem;
@@ -200,13 +250,37 @@
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .start-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .start-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+
+        .end-button {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+        }
+
+        .end-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+        }
+
+        .submit-button {
+            background: linear-gradient(135deg, #9333ea 0%, #2563eb 100%);
+            color: white;
         }
 
         .submit-button:hover:not(:disabled) {
             background: linear-gradient(135deg, #7c3aed 0%, #1d4ed8 100%);
         }
 
-        .submit-button:disabled {
+        .control-button:disabled {
             background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
             cursor: not-allowed;
         }
@@ -465,6 +539,16 @@
             max-height: 200px;
             overflow-y: auto;
         }
+
+        .voting-closed-message {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            color: #92400e;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -491,12 +575,12 @@
                         <i data-lucide="vote"></i>
                         투표하기
                     </button>
-                    <button class="nav-button inactive" onclick="showTab('results')" id="resultsTab">
+                    <button class="nav-button inactive" onclick="showTab('results')" id="resultsTab" disabled>
                         <i data-lucide="bar-chart-3"></i>
-                        실시간 결과 (<span id="totalVotesNav">0</span>)
+                        결과 보기
                     </button>
                     <button class="nav-button inactive" onclick="showTab('admin')" id="adminTab">
-                        <i data-lucide="database"></i>
+                        <i data-lucide="settings"></i>
                         관리
                     </button>
                 </div>
@@ -506,58 +590,149 @@
             <div class="content">
                 <!-- 투표 탭 -->
                 <div id="voteContent" class="vote-section">
-                    <div class="vote-header">
-                        <h2>익명 투표</h2>
-                        <p>모든 투표는 실시간으로 반영되며 완전 익명입니다</p>
-                    </div>
-                    
-                    <div class="vote-form">
-                        <div class="form-group">
-                            <label class="form-label">투표 내용을 입력하세요</label>
-                            <textarea 
-                                id="voteInput" 
-                                class="vote-input" 
-                                rows="4" 
-                                placeholder="후보자 이름, 선택지, 의견 등을 자유롭게 입력하세요...">
-                            </textarea>
+                    <!-- 투표 준비 상태 -->
+                    <div id="votingPrepareState">
+                        <div class="vote-header">
+                            <h2>투표 준비</h2>
+                            <p>투표 주제를 입력하고 투표를 시작하세요</p>
                         </div>
                         
-                        <button id="submitButton" class="submit-button" onclick="submitVote()">
-                            📤 익명으로 투표하기
-                        </button>
-                        
-                        <div id="errorMessage" class="error-message hidden">
-                            Firebase에 연결되지 않았습니다. 잠시 후 다시 시도해주세요.
+                        <div class="vote-status-card">
+                            <div class="status-icon">⚙️</div>
+                            <div class="status-title">투표 대기 중</div>
+                            <div class="status-description">투표 주제를 입력하고 시작 버튼을 눌러주세요</div>
                         </div>
 
-                        <!-- 디버그 정보 표시 -->
-                        <div id="debugInfo" class="debug-info hidden">
-                            <strong>연결 디버그 정보:</strong><br>
-                            <div id="debugContent">초기화 중...</div>
+                        <div class="vote-form">
+                            <div class="form-group">
+                                <label class="form-label">투표 주제</label>
+                                <textarea 
+                                    id="topicInput" 
+                                    class="topic-input" 
+                                    rows="3" 
+                                    placeholder="투표 주제를 입력하세요 (예: 점심 메뉴 선택, 회사 행사 아이디어 등)">
+                                </textarea>
+                            </div>
+                            
+                            <button id="startVotingButton" class="control-button start-button" onclick="startVoting()">
+                                🚀 투표 시작하기
+                            </button>
                         </div>
+                    </div>
+
+                    <!-- 투표 진행 상태 -->
+                    <div id="votingActiveState" class="hidden">
+                        <div class="vote-header">
+                            <h2>투표 진행 중</h2>
+                            <p>투표가 진행 중입니다. 자유롭게 의견을 제출해주세요</p>
+                        </div>
+
+                        <div class="topic-display">
+                            <div class="topic-label">투표 주제</div>
+                            <div id="currentTopic" class="topic-text"></div>
+                        </div>
+                        
+                        <div class="vote-status-card">
+                            <div class="status-icon">🗳️</div>
+                            <div class="status-title">투표 진행 중</div>
+                            <div class="status-description">현재 <span id="currentVoteCount">0</span>표가 접수되었습니다</div>
+                        </div>
+
+                        <div class="vote-form">
+                            <div class="form-group">
+                                <label class="form-label">투표 내용을 입력하세요</label>
+                                <textarea 
+                                    id="voteInput" 
+                                    class="vote-input" 
+                                    rows="4" 
+                                    placeholder="후보자 이름, 선택지, 의견 등을 자유롭게 입력하세요...">
+                                </textarea>
+                            </div>
+                            
+                            <button id="submitButton" class="control-button submit-button" onclick="submitVote()">
+                                📤 익명으로 투표하기
+                            </button>
+
+                            <button id="endVotingButton" class="control-button end-button" onclick="endVoting()">
+                                ⏹️ 투표 종료하기
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 투표 종료 상태 -->
+                    <div id="votingClosedState" class="hidden">
+                        <div class="vote-header">
+                            <h2>투표 종료</h2>
+                            <p>투표가 종료되었습니다. 결과를 확인해보세요</p>
+                        </div>
+
+                        <div class="topic-display">
+                            <div class="topic-label">투표 주제</div>
+                            <div id="closedTopic" class="topic-text"></div>
+                        </div>
+                        
+                        <div class="vote-status-card">
+                            <div class="status-icon">✅</div>
+                            <div class="status-title">투표 완료</div>
+                            <div class="status-description">총 <span id="finalVoteCount">0</span>표가 접수되었습니다</div>
+                        </div>
+
+                        <div class="voting-closed-message">
+                            투표가 종료되어 더 이상 투표할 수 없습니다.<br>
+                            결과는 '결과 보기' 탭에서 확인할 수 있습니다.
+                        </div>
+
+                        <div class="vote-form">
+                            <button id="newVotingButton" class="control-button start-button" onclick="prepareNewVoting()">
+                                🔄 새 투표 시작하기
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="errorMessage" class="error-message hidden">
+                        Firebase에 연결되지 않았습니다. 잠시 후 다시 시도해주세요.
+                    </div>
+
+                    <!-- 디버그 정보 표시 -->
+                    <div id="debugInfo" class="debug-info hidden">
+                        <strong>연결 디버그 정보:</strong><br>
+                        <div id="debugContent">초기화 중...</div>
                     </div>
                 </div>
 
                 <!-- 결과 탭 -->
                 <div id="resultsContent" class="hidden">
-                    <div class="results-header">
-                        <h2>실시간 투표 결과</h2>
-                        <div class="auto-refresh">
-                            <span>자동 새로고침</span>
-                            <i data-lucide="refresh-cw" class="rotating"></i>
+                    <!-- 투표 진행 중일 때 -->
+                    <div id="resultsBlocked">
+                        <div class="vote-status-card">
+                            <div class="status-icon">🔒</div>
+                            <div class="status-title">결과는 투표 종료 후 공개됩니다</div>
+                            <div class="status-description">투표의 공정성을 위해 결과는 투표가 완료된 후에 확인할 수 있습니다</div>
                         </div>
                     </div>
-                    
-                    <div class="stats-card">
-                        <div id="totalVotes" class="stats-number">0</div>
-                        <div class="stats-label">총 투표 수</div>
-                    </div>
 
-                    <div id="resultsContainer">
-                        <div class="empty-results">
-                            <i data-lucide="vote"></i>
-                            <h3>아직 투표가 없습니다</h3>
-                            <div>첫 번째 투표를 해보세요!</div>
+                    <!-- 투표 종료 후 결과 -->
+                    <div id="resultsActive" class="hidden">
+                        <div class="results-header">
+                            <h2>최종 투표 결과</h2>
+                        </div>
+
+                        <div class="topic-display">
+                            <div class="topic-label">투표 주제</div>
+                            <div id="resultsTopic" class="topic-text"></div>
+                        </div>
+                        
+                        <div class="stats-card">
+                            <div id="totalVotes" class="stats-number">0</div>
+                            <div class="stats-label">총 투표 수</div>
+                        </div>
+
+                        <div id="resultsContainer">
+                            <div class="empty-results">
+                                <i data-lucide="vote"></i>
+                                <h3>투표 결과가 없습니다</h3>
+                                <div>투표가 진행되지 않았거나 투표가 없었습니다</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -566,11 +741,20 @@
                 <div id="adminContent" class="admin-section hidden">
                     <h2>시스템 관리</h2>
                     
+                    <div class="info-card">
+                        <h3>투표 상태</h3>
+                        <div class="info-list">
+                            <div class="info-item">현재 상태: <span id="adminVotingStatus" class="info-value">준비 중</span></div>
+                            <div class="info-item">투표 주제: <span id="adminCurrentTopic" class="info-value">설정되지 않음</span></div>
+                            <div class="info-item">총 투표 수: <span id="adminVotes" class="info-value">0</span></div>
+                        </div>
+                    </div>
+
                     <div class="danger-zone">
                         <h3>위험 구역</h3>
-                        <p>모든 투표 데이터를 삭제합니다. 이 작업은 되돌릴 수 없습니다.</p>
-                        <button class="danger-button" onclick="resetVotes()">
-                            모든 투표 데이터 삭제
+                        <p>모든 투표 데이터를 삭제하고 새로 시작합니다. 이 작업은 되돌릴 수 없습니다.</p>
+                        <button class="danger-button" onclick="resetAllData()">
+                            모든 데이터 초기화
                         </button>
                     </div>
 
@@ -578,7 +762,6 @@
                         <h3>Firebase 연결 정보</h3>
                         <div class="info-list">
                             <div class="info-item">상태: <span id="adminStatus" class="info-value">연결 중...</span></div>
-                            <div class="info-item">총 투표 수: <span id="adminVotes" class="info-value">0</span></div>
                             <div class="info-item">데이터베이스: <span class="info-value">Firebase Realtime Database</span></div>
                         </div>
                     </div>
@@ -606,10 +789,26 @@
         // 전역 변수
         let database = null;
         let votesRef = null;
+        let statusRef = null;
         let isFirebaseConnected = false;
         let votes = {};
+        let votingStatus = {
+            isActive: false,
+            topic: '',
+            startTime: null,
+            endTime: null
+        };
         let isSubmitting = false;
         let currentTab = 'vote';
+
+        // 투표 상태 관리
+        const VOTING_STATES = {
+            PREPARE: 'prepare',
+            ACTIVE: 'active', 
+            CLOSED: 'closed'
+        };
+
+        let currentVotingState = VOTING_STATES.PREPARE;
 
         // 디버그 로그 함수
         function debugLog(message, data = '') {
@@ -656,14 +855,12 @@
                 try {
                     debugLog('Firebase 초기화 시작...');
                     
-                    // Firebase 라이브러리 확인
                     if (typeof firebase === 'undefined') {
                         throw new Error('Firebase 라이브러리가 로드되지 않았습니다');
                     }
                     
                     debugLog('Firebase 라이브러리 확인됨');
                     
-                    // Firebase 앱 초기화 (이미 초기화된 경우 체크)
                     if (firebase.apps.length === 0) {
                         firebase.initializeApp(firebaseConfig);
                         debugLog('Firebase 앱 초기화 완료');
@@ -674,9 +871,10 @@
                     // Database 레퍼런스 생성
                     database = firebase.database();
                     votesRef = database.ref('votes');
+                    statusRef = database.ref('status');
                     debugLog('Database 레퍼런스 생성 완료');
                     
-                    // 연결 테스트 - 더 안전한 방법 사용
+                    // 연결 테스트
                     const connectedRef = database.ref('.info/connected');
                     
                     connectedRef.on('value', (snapshot) => {
@@ -685,18 +883,8 @@
                             isFirebaseConnected = true;
                             updateConnectionStatus('connected');
                             
-                            // 실시간 데이터 리스너 설정 (한 번만)
-                            if (!votesRef._listeners || votesRef._listeners.length === 0) {
-                                votesRef.on('value', (snapshot) => {
-                                    const data = snapshot.val();
-                                    debugLog('Firebase에서 데이터 수신:', data);
-                                    votes = data || {};
-                                    updateResults();
-                                }, (error) => {
-                                    debugLog('데이터 리스너 에러:', error.message);
-                                });
-                            }
-                            
+                            // 실시간 데이터 리스너 설정
+                            setupRealtimeListeners();
                             resolve();
                         } else {
                             debugLog('Firebase 연결 끊김');
@@ -705,17 +893,6 @@
                         }
                     });
                     
-                    // 초기 데이터 로드 시도
-                    votesRef.once('value')
-                        .then((snapshot) => {
-                            debugLog('초기 데이터 로드 성공');
-                            votes = snapshot.val() || {};
-                            updateResults();
-                        })
-                        .catch((error) => {
-                            debugLog('초기 데이터 로드 실패:', error.message);
-                        });
-                        
                 } catch (error) {
                     debugLog('Firebase 초기화 실패:', error.message);
                     isFirebaseConnected = false;
@@ -725,91 +902,177 @@
             });
         }
 
-        // 아이콘 초기화
-        function initIcons() {
-            try {
-                if (typeof lucide !== 'undefined' && lucide.createIcons) {
-                    lucide.createIcons();
-                    debugLog('아이콘 초기화 완료');
-                } else {
-                    debugLog('Lucide 라이브러리가 아직 로드되지 않음');
-                    setTimeout(initIcons, 500);
+        // 실시간 리스너 설정
+        function setupRealtimeListeners() {
+            // 투표 데이터 리스너
+            votesRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                debugLog('투표 데이터 수신:', data);
+                votes = data || {};
+                updateVoteCounts();
+                if (currentVotingState === VOTING_STATES.CLOSED) {
+                    updateResults();
                 }
-            } catch (error) {
-                debugLog('아이콘 초기화 오류:', error.message);
+            });
+
+            // 투표 상태 리스너
+            statusRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                debugLog('상태 데이터 수신:', data);
+                if (data) {
+                    votingStatus = data;
+                    updateVotingState();
+                }
+            });
+        }
+
+        // 투표 상태 업데이트
+        function updateVotingState() {
+            debugLog('투표 상태 업데이트:', votingStatus);
+            
+            if (votingStatus.isActive) {
+                currentVotingState = VOTING_STATES.ACTIVE;
+            } else if (votingStatus.topic && votingStatus.endTime) {
+                currentVotingState = VOTING_STATES.CLOSED;
+            } else {
+                currentVotingState = VOTING_STATES.PREPARE;
+            }
+
+            showVotingState(currentVotingState);
+            updateAdminInfo();
+            updateResultsAccess();
+        }
+
+        // 투표 상태별 UI 표시
+        function showVotingState(state) {
+            // 모든 상태 숨기기
+            document.getElementById('votingPrepareState').classList.add('hidden');
+            document.getElementById('votingActiveState').classList.add('hidden');
+            document.getElementById('votingClosedState').classList.add('hidden');
+
+            switch(state) {
+                case VOTING_STATES.PREPARE:
+                    document.getElementById('votingPrepareState').classList.remove('hidden');
+                    break;
+                case VOTING_STATES.ACTIVE:
+                    document.getElementById('votingActiveState').classList.remove('hidden');
+                    document.getElementById('currentTopic').textContent = votingStatus.topic || '';
+                    break;
+                case VOTING_STATES.CLOSED:
+                    document.getElementById('votingClosedState').classList.remove('hidden');
+                    document.getElementById('closedTopic').textContent = votingStatus.topic || '';
+                    break;
             }
         }
 
-        // 페이지 로드 시 초기화
-        document.addEventListener('DOMContentLoaded', function() {
-            debugLog('페이지 로드됨');
-            
-            // 연결 상태를 connecting으로 설정
-            updateConnectionStatus('connecting');
-            
-            // Lucide 아이콘 초기화
-            setTimeout(initIcons, 100);
-            
-            // Firebase 초기화
-            setTimeout(() => {
-                initFirebase()
-                    .then(() => {
-                        debugLog('Firebase 초기화 성공');
-                    })
-                    .catch((error) => {
-                        debugLog('Firebase 초기화 실패, 로컬 모드로 전환:', error.message);
-                        
-                        // 사용자에게 알림
-                        const errorDiv = document.getElementById('errorMessage');
-                        if (errorDiv) {
-                            errorDiv.textContent = `Firebase 연결 실패: ${error.message}`;
-                            errorDiv.classList.remove('hidden');
-                        }
-                        
-                        // 로컬 스토리지로 폴백
-                        loadVotesFromStorage();
-                        updateResults();
-                    });
-            }, 1000);
-            
-            // 투표 입력창 Enter 키 이벤트
-            const voteInput = document.getElementById('voteInput');
-            if (voteInput) {
-                voteInput.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter' && e.ctrlKey) {
-                        e.preventDefault();
-                        submitVote();
-                    }
-                });
+        // 결과 탭 접근 권한 업데이트
+        function updateResultsAccess() {
+            const resultsTab = document.getElementById('resultsTab');
+            const resultsBlocked = document.getElementById('resultsBlocked');
+            const resultsActive = document.getElementById('resultsActive');
+
+            if (currentVotingState === VOTING_STATES.CLOSED) {
+                resultsTab.disabled = false;
+                resultsBlocked.classList.add('hidden');
+                resultsActive.classList.remove('hidden');
+                document.getElementById('resultsTopic').textContent = votingStatus.topic || '';
+            } else {
+                resultsTab.disabled = true;
+                resultsBlocked.classList.remove('hidden');
+                resultsActive.classList.add('hidden');
+                
+                // 현재 결과 탭이 활성화되어 있다면 투표 탭으로 이동
+                if (currentTab === 'results') {
+                    showTab('vote');
+                }
             }
-        });
+        }
 
-        // 탭 전환
-        function showTab(tabName) {
-            // 모든 탭 내용 숨기기
-            document.getElementById('voteContent').classList.add('hidden');
-            document.getElementById('resultsContent').classList.add('hidden');
-            document.getElementById('adminContent').classList.add('hidden');
+        // 투표 수 업데이트
+        function updateVoteCounts() {
+            const totalVotes = Object.values(votes).reduce((sum, count) => sum + count, 0);
+            
+            // 현재 투표 수 표시
+            const currentVoteCount = document.getElementById('currentVoteCount');
+            const finalVoteCount = document.getElementById('finalVoteCount');
+            const totalVotesElement = document.getElementById('totalVotes');
+            const adminVotes = document.getElementById('adminVotes');
 
-            // 모든 탭 버튼 비활성화
-            document.querySelectorAll('.nav-button').forEach(btn => {
-                btn.classList.remove('active');
-                btn.classList.add('inactive');
-            });
+            if (currentVoteCount) currentVoteCount.textContent = totalVotes;
+            if (finalVoteCount) finalVoteCount.textContent = totalVotes;
+            if (totalVotesElement) totalVotesElement.textContent = totalVotes;
+            if (adminVotes) adminVotes.textContent = totalVotes;
+        }
 
-            // 선택된 탭 보이기
-            document.getElementById(tabName + 'Content').classList.remove('hidden');
-            document.getElementById(tabName + 'Tab').classList.remove('inactive');
-            document.getElementById(tabName + 'Tab').classList.add('active');
+        // 관리자 정보 업데이트
+        function updateAdminInfo() {
+            const adminVotingStatus = document.getElementById('adminVotingStatus');
+            const adminCurrentTopic = document.getElementById('adminCurrentTopic');
 
-            currentTab = tabName;
-            debugLog(`탭 전환: ${tabName}`);
+            let statusText = '';
+            switch(currentVotingState) {
+                case VOTING_STATES.PREPARE:
+                    statusText = '준비 중';
+                    break;
+                case VOTING_STATES.ACTIVE:
+                    statusText = '투표 진행 중';
+                    break;
+                case VOTING_STATES.CLOSED:
+                    statusText = '투표 종료';
+                    break;
+            }
+
+            if (adminVotingStatus) adminVotingStatus.textContent = statusText;
+            if (adminCurrentTopic) {
+                adminCurrentTopic.textContent = votingStatus.topic || '설정되지 않음';
+            }
+        }
+
+        // 투표 시작
+        function startVoting() {
+            const topicInput = document.getElementById('topicInput');
+            const topic = topicInput.value.trim();
+
+            if (!topic) {
+                alert('투표 주제를 입력해주세요.');
+                return;
+            }
+
+            if (!isFirebaseConnected) {
+                alert('Firebase에 연결되지 않았습니다. 연결을 확인해주세요.');
+                return;
+            }
+
+            debugLog('투표 시작:', topic);
+
+            const newStatus = {
+                isActive: true,
+                topic: topic,
+                startTime: Date.now(),
+                endTime: null
+            };
+
+            statusRef.set(newStatus)
+                .then(() => {
+                    debugLog('투표 시작 완료');
+                    topicInput.value = '';
+                    alert('✅ 투표가 시작되었습니다!');
+                })
+                .catch((error) => {
+                    debugLog('투표 시작 실패:', error.message);
+                    alert('❌ 투표 시작에 실패했습니다: ' + error.message);
+                });
         }
 
         // 투표 제출
         function submitVote() {
             debugLog('=== 투표 제출 시작 ===');
             
+            if (currentVotingState !== VOTING_STATES.ACTIVE) {
+                alert('현재 투표가 진행 중이 아닙니다.');
+                return;
+            }
+
             const voteInput = document.getElementById('voteInput');
             const submitButton = document.getElementById('submitButton');
             const errorMessage = document.getElementById('errorMessage');
@@ -820,19 +1083,20 @@
                 return;
             }
 
-            const inputValue = voteInput.value ? voteInput.value.trim() : '';
-            debugLog('입력값:', `"${inputValue}"`);
-            debugLog('Firebase 연결 상태:', isFirebaseConnected);
-            debugLog('votesRef 존재:', !!votesRef);
+            const inputValue = voteInput.value.trim();
+            debugLog('입력값:', inputValue);
 
             if (!inputValue) {
-                debugLog('입력값이 비어있음');
                 alert('투표 내용을 입력해주세요.');
                 return;
             }
             
             if (isSubmitting) {
-                debugLog('이미 제출 중');
+                return;
+            }
+
+            if (!isFirebaseConnected || !votesRef) {
+                alert('Firebase에 연결되지 않았습니다. 연결을 확인해주세요.');
                 return;
             }
 
@@ -840,36 +1104,12 @@
             isSubmitting = true;
             submitButton.disabled = true;
             submitButton.style.opacity = '0.7';
+            submitButton.innerHTML = '⟳ 투표 저장 중...';
             
             if (errorMessage) {
                 errorMessage.classList.add('hidden');
             }
 
-            if (!isFirebaseConnected || !votesRef) {
-                debugLog('Firebase 연결되지 않음, 로컬 스토리지 사용');
-                submitButton.innerHTML = '💾 로컬에 저장 중...';
-                
-                // 로컬 스토리지에 저장
-                votes[inputValue] = (votes[inputValue] || 0) + 1;
-                saveVotesToStorage();
-                updateResults();
-                
-                voteInput.value = '';
-                alert('✅ 로컬에 투표가 저장되었습니다! (Firebase 미연결)');
-                
-                setTimeout(() => {
-                    showTab('results');
-                }, 300);
-                
-                // UI 복원
-                isSubmitting = false;
-                submitButton.disabled = false;
-                submitButton.style.opacity = '1';
-                submitButton.innerHTML = '📤 익명으로 투표하기';
-                return;
-            }
-
-            submitButton.innerHTML = '⟳ Firebase에 저장 중...';
             debugLog('Firebase로 투표 전송:', inputValue);
             
             // Firebase transaction 사용
@@ -878,27 +1118,20 @@
                 return (currentData || 0) + 1;
             }).then((result) => {
                 debugLog('Firebase 투표 성공:', result.snapshot.val());
-                debugLog('Transaction 완료:', result.committed);
                 
                 if (result.committed) {
                     voteInput.value = '';
-                    alert('✅ Firebase에 투표가 저장되었습니다!');
-                    
-                    setTimeout(() => {
-                        showTab('results');
-                    }, 300);
+                    alert('✅ 투표가 완료되었습니다!');
                 } else {
-                    debugLog('Transaction이 커밋되지 않음');
                     alert('⚠️ 투표 처리 중 문제가 발생했습니다. 다시 시도해주세요.');
                 }
                 
             }).catch((error) => {
                 debugLog('Firebase 투표 실패:', error.message);
-                debugLog('에러 코드:', error.code);
                 
                 let errorMsg = 'Firebase 저장 실패: ';
                 if (error.code === 'PERMISSION_DENIED') {
-                    errorMsg += '데이터베이스 권한이 없습니다. Firebase 보안 규칙을 확인해주세요.';
+                    errorMsg += '데이터베이스 권한이 없습니다.';
                 } else if (error.code === 'NETWORK_ERROR') {
                     errorMsg += '네트워크 연결을 확인해주세요.';
                 } else {
@@ -920,25 +1153,62 @@
             });
         }
 
-        // 투표 결과 업데이트
+        // 투표 종료
+        function endVoting() {
+            if (!confirm('투표를 종료하시겠습니까?\n\n투표 종료 후에는 더 이상 투표할 수 없으며, 결과가 공개됩니다.')) {
+                return;
+            }
+
+            if (!isFirebaseConnected || !statusRef) {
+                alert('Firebase에 연결되지 않았습니다.');
+                return;
+            }
+
+            debugLog('투표 종료 처리');
+
+            const updatedStatus = {
+                ...votingStatus,
+                isActive: false,
+                endTime: Date.now()
+            };
+
+            statusRef.set(updatedStatus)
+                .then(() => {
+                    debugLog('투표 종료 완료');
+                    alert('✅ 투표가 종료되었습니다! 이제 결과를 확인할 수 있습니다.');
+                })
+                .catch((error) => {
+                    debugLog('투표 종료 실패:', error.message);
+                    alert('❌ 투표 종료에 실패했습니다: ' + error.message);
+                });
+        }
+
+        // 새 투표 준비
+        function prepareNewVoting() {
+            if (!confirm('새 투표를 시작하시겠습니까?\n\n기존 투표 데이터는 모두 삭제됩니다.')) {
+                return;
+            }
+
+            resetAllData();
+        }
+
+        // 투표 결과 업데이트 (투표 종료 후에만)
         function updateResults() {
+            if (currentVotingState !== VOTING_STATES.CLOSED) {
+                return;
+            }
+
             const totalVotes = Object.values(votes).reduce((sum, count) => sum + count, 0);
             const sortedResults = Object.entries(votes).sort((a, b) => b[1] - a[1]);
 
-            // 총 투표 수 업데이트
-            document.getElementById('totalVotes').textContent = totalVotes;
-            document.getElementById('totalVotesNav').textContent = totalVotes;
-            document.getElementById('adminVotes').textContent = totalVotes;
-
-            // 결과 컨테이너
             const resultsContainer = document.getElementById('resultsContainer');
 
             if (sortedResults.length === 0) {
                 resultsContainer.innerHTML = `
                     <div class="empty-results">
                         🗳️
-                        <h3>아직 투표가 없습니다</h3>
-                        <div>첫 번째 투표를 해보세요!</div>
+                        <h3>투표 결과가 없습니다</h3>
+                        <div>투표가 진행되지 않았거나 투표가 없었습니다</div>
                     </div>
                 `;
             } else {
@@ -982,58 +1252,98 @@
             debugLog('결과 업데이트 완료, 총 투표 수:', totalVotes);
         }
 
-        // 투표 초기화
-        function resetVotes() {
-            if (confirm('모든 투표 데이터를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!')) {
-                debugLog('투표 데이터 초기화 시작');
-                
-                if (isFirebaseConnected && votesRef) {
-                    // Firebase에서 삭제
-                    votesRef.remove()
-                        .then(() => {
-                            debugLog('Firebase 데이터 삭제 완료');
-                            votes = {};
-                            updateResults();
-                            alert('✅ 모든 투표 데이터가 삭제되었습니다.');
-                        })
-                        .catch((error) => {
-                            debugLog('Firebase 데이터 삭제 실패:', error.message);
-                            alert('❌ Firebase 데이터 삭제 실패: ' + error.message);
-                        });
-                } else {
-                    // 로컬 스토리지에서 삭제
+        // 모든 데이터 초기화
+        function resetAllData() {
+            if (!confirm('모든 투표 데이터를 삭제하고 처음부터 시작하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!')) {
+                return;
+            }
+
+            debugLog('모든 데이터 초기화 시작');
+            
+            if (isFirebaseConnected && database) {
+                // Firebase에서 모든 데이터 삭제
+                Promise.all([
+                    votesRef.remove(),
+                    statusRef.remove()
+                ]).then(() => {
+                    debugLog('Firebase 데이터 삭제 완료');
+                    
+                    // 로컬 상태 초기화
                     votes = {};
-                    saveVotesToStorage();
-                    updateResults();
-                    alert('✅ 로컬 투표 데이터가 삭제되었습니다.');
-                    debugLog('로컬 데이터 삭제 완료');
+                    votingStatus = {
+                        isActive: false,
+                        topic: '',
+                        startTime: null,
+                        endTime: null
+                    };
+                    currentVotingState = VOTING_STATES.PREPARE;
+                    
+                    // UI 업데이트
+                    showVotingState(VOTING_STATES.PREPARE);
+                    updateVoteCounts();
+                    updateAdminInfo();
+                    updateResultsAccess();
+                    
+                    alert('✅ 모든 데이터가 삭제되고 초기화되었습니다.');
+                }).catch((error) => {
+                    debugLog('Firebase 데이터 삭제 실패:', error.message);
+                    alert('❌ 데이터 삭제 실패: ' + error.message);
+                });
+            } else {
+                alert('❌ Firebase에 연결되지 않았습니다.');
+            }
+        }
+
+        // 탭 전환
+        function showTab(tabName) {
+            // 결과 탭이 비활성화된 경우 접근 금지
+            if (tabName === 'results' && document.getElementById('resultsTab').disabled) {
+                alert('투표가 종료된 후에 결과를 확인할 수 있습니다.');
+                return;
+            }
+
+            // 모든 탭 내용 숨기기
+            document.getElementById('voteContent').classList.add('hidden');
+            document.getElementById('resultsContent').classList.add('hidden');
+            document.getElementById('adminContent').classList.add('hidden');
+
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                if (!btn.disabled) {
+                    btn.classList.remove('active');
+                    btn.classList.add('inactive');
                 }
+            });
+
+            // 선택된 탭 보이기
+            document.getElementById(tabName + 'Content').classList.remove('hidden');
+            const selectedTab = document.getElementById(tabName + 'Tab');
+            if (!selectedTab.disabled) {
+                selectedTab.classList.remove('inactive');
+                selectedTab.classList.add('active');
+            }
+
+            currentTab = tabName;
+            debugLog(`탭 전환: ${tabName}`);
+
+            // 결과 탭으로 전환 시 결과 업데이트
+            if (tabName === 'results' && currentVotingState === VOTING_STATES.CLOSED) {
+                updateResults();
             }
         }
 
-        // localStorage 관련 함수들
-        function saveVotesToStorage() {
+        // 아이콘 초기화
+        function initIcons() {
             try {
-                localStorage.setItem('anonymous_votes', JSON.stringify(votes));
-                debugLog('로컬 스토리지에 저장 완료');
-            } catch (error) {
-                debugLog('로컬 스토리지 저장 실패:', error.message);
-            }
-        }
-
-        function loadVotesFromStorage() {
-            try {
-                const storedVotes = localStorage.getItem('anonymous_votes');
-                if (storedVotes) {
-                    votes = JSON.parse(storedVotes);
-                    updateResults();
-                    debugLog('로컬 스토리지에서 데이터 로드 완료');
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons();
+                    debugLog('아이콘 초기화 완료');
                 } else {
-                    debugLog('로컬 스토리지에 저장된 데이터가 없음');
+                    debugLog('Lucide 라이브러리가 아직 로드되지 않음');
+                    setTimeout(initIcons, 500);
                 }
             } catch (error) {
-                debugLog('로컬 스토리지 로드 실패:', error.message);
-                votes = {};
+                debugLog('아이콘 초기화 오류:', error.message);
             }
         }
 
@@ -1045,36 +1355,55 @@
             }
         }
 
-        // Firebase 보안 규칙 테스트
-        function testFirebasePermissions() {
-            debugLog('Firebase 권한 테스트 시작');
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog('페이지 로드됨');
             
-            if (!isFirebaseConnected || !votesRef) {
-                debugLog('Firebase가 연결되지 않아 권한 테스트 불가');
-                return;
+            // 연결 상태를 connecting으로 설정
+            updateConnectionStatus('connecting');
+            
+            // Lucide 아이콘 초기화
+            setTimeout(initIcons, 100);
+            
+            // Firebase 초기화
+            setTimeout(() => {
+                initFirebase()
+                    .then(() => {
+                        debugLog('Firebase 초기화 성공');
+                    })
+                    .catch((error) => {
+                        debugLog('Firebase 초기화 실패:', error.message);
+                        
+                        const errorDiv = document.getElementById('errorMessage');
+                        if (errorDiv) {
+                            errorDiv.textContent = `Firebase 연결 실패: ${error.message}`;
+                            errorDiv.classList.remove('hidden');
+                        }
+                    });
+            }, 1000);
+            
+            // 투표 입력창 Enter 키 이벤트 (Ctrl+Enter로 제출)
+            const voteInput = document.getElementById('voteInput');
+            if (voteInput) {
+                voteInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        e.preventDefault();
+                        submitVote();
+                    }
+                });
             }
 
-            // 읽기 권한 테스트
-            votesRef.once('value')
-                .then((snapshot) => {
-                    debugLog('읽기 권한: ✅ 성공');
-                })
-                .catch((error) => {
-                    debugLog('읽기 권한: ❌ 실패 -', error.message);
+            // 주제 입력창 Enter 키 이벤트 (Ctrl+Enter로 시작)
+            const topicInput = document.getElementById('topicInput');
+            if (topicInput) {
+                topicInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        e.preventDefault();
+                        startVoting();
+                    }
                 });
-
-            // 쓰기 권한 테스트
-            const testRef = votesRef.child('_test_' + Date.now());
-            testRef.set(1)
-                .then(() => {
-                    debugLog('쓰기 권한: ✅ 성공');
-                    // 테스트 데이터 삭제
-                    testRef.remove();
-                })
-                .catch((error) => {
-                    debugLog('쓰기 권한: ❌ 실패 -', error.message);
-                });
-        }
+            }
+        });
 
         // 페이지를 닫을 때 연결 해제
         window.addEventListener('beforeunload', function() {
@@ -1087,13 +1416,6 @@
                 }
             }
         });
-
-        // 5초 후 권한 테스트 실행
-        setTimeout(() => {
-            if (isFirebaseConnected) {
-                testFirebasePermissions();
-            }
-        }, 5000);
     </script>
 </body>
 </html>
